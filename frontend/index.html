@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WikiMind — AI-Powered Wikipedia Q&A</title>
+  <meta name="description" content="Ask any question and get a grounded, AI-generated answer sourced directly from Wikipedia. Powered by semantic search and GPT." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+
+  <!-- Animated background -->
+  <div class="bg-orb bg-orb--1"></div>
+  <div class="bg-orb bg-orb--2"></div>
+  <div class="bg-orb bg-orb--3"></div>
+  <canvas id="particles-canvas"></canvas>
+
+  <div class="app">
+
+    <!-- ── Header ─────────────────────────────────────── -->
+    <header class="header">
+      <div class="logo">
+        <span class="logo-icon">⚡</span>
+        <span class="logo-text">WikiMind</span>
+      </div>
+      <div class="header-badge">
+        <span class="badge-dot" id="health-dot"></span>
+        <span id="health-label">Checking…</span>
+      </div>
+    </header>
+
+    <!-- ── Hero ──────────────────────────────────────── -->
+    <section class="hero">
+      <h1 class="hero-title">
+        Ask anything.<br />
+        <span class="gradient-text">Wikipedia answers.</span>
+      </h1>
+      <p class="hero-sub">
+        Semantic search + GPT · Grounded answers · Redis-cached · No hallucinations
+      </p>
+
+      <!-- Search form -->
+      <form class="search-form" id="search-form" autocomplete="off">
+        <div class="search-box" id="search-box">
+          <span class="search-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+          </span>
+          <input
+            type="text"
+            id="question-input"
+            class="search-input"
+            placeholder="e.g. How does photosynthesis work?"
+            aria-label="Enter your question"
+            required
+            minlength="3"
+          />
+          <button type="submit" id="ask-btn" class="ask-btn" aria-label="Ask">
+            <span class="ask-btn-text">Ask</span>
+            <span class="ask-btn-arrow">→</span>
+          </button>
+        </div>
+
+        <!-- Example queries -->
+        <div class="examples">
+          <span class="examples-label">Try:</span>
+          <button type="button" class="example-chip" data-q="What is quantum entanglement?">Quantum entanglement</button>
+          <button type="button" class="example-chip" data-q="How does the immune system work?">Immune system</button>
+          <button type="button" class="example-chip" data-q="What caused World War I?">World War I</button>
+          <button type="button" class="example-chip" data-q="Explain neural networks">Neural networks</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ── Loading state ─────────────────────────────── -->
+    <div class="loading-container" id="loading-container" hidden>
+      <div class="loading-card">
+        <div class="spinner"></div>
+        <div class="loading-steps" id="loading-steps">
+          <div class="loading-step active" id="step-1">🔍 Searching Wikipedia…</div>
+          <div class="loading-step" id="step-2">📄 Fetching page content…</div>
+          <div class="loading-step" id="step-3">🧠 Computing embeddings…</div>
+          <div class="loading-step" id="step-4">✨ Generating answer…</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Error ────────────────────────────────────── -->
+    <div class="error-container" id="error-container" hidden>
+      <div class="error-card">
+        <span class="error-icon">⚠️</span>
+        <p id="error-message">Something went wrong.</p>
+        <button class="retry-btn" id="retry-btn">Try again</button>
+      </div>
+    </div>
+
+    <!-- ── Results ──────────────────────────────────── -->
+    <section class="results" id="results" hidden>
+
+      <!-- Meta bar -->
+      <div class="results-meta" id="results-meta">
+        <div class="meta-left">
+          <span class="page-title-badge" id="page-title-badge"></span>
+          <a class="wiki-link" id="wiki-link" target="_blank" rel="noopener noreferrer">
+            View on Wikipedia ↗
+          </a>
+        </div>
+        <div class="cache-badge" id="cache-badge"></div>
+      </div>
+
+      <!-- Grid -->
+      <div class="results-grid">
+
+        <!-- Main answer -->
+        <div class="card card--answer">
+          <div class="card-header">
+            <span class="card-icon">💡</span>
+            <h2 class="card-title">Answer</h2>
+          </div>
+          <div class="card-body">
+            <p id="answer-text" class="answer-text"></p>
+          </div>
+        </div>
+
+        <!-- Extra info -->
+        <div class="card card--extra">
+          <div class="card-header">
+            <span class="card-icon">📚</span>
+            <h2 class="card-title">Wikipedia Summary</h2>
+          </div>
+          <div class="card-body">
+            <p id="extra-info-text" class="extra-info-text"></p>
+          </div>
+        </div>
+
+        <!-- Sources -->
+        <div class="card card--sources">
+          <div class="card-header">
+            <span class="card-icon">🔗</span>
+            <h2 class="card-title">Sources Used</h2>
+          </div>
+          <div class="card-body">
+            <div id="sources-list" class="sources-list"></div>
+          </div>
+        </div>
+
+        <!-- Right column -->
+        <div class="right-column">
+
+          <!-- Related topics -->
+          <div class="card card--related">
+            <div class="card-header">
+              <span class="card-icon">🗺️</span>
+              <h2 class="card-title">Related Topics</h2>
+            </div>
+            <div class="card-body">
+              <div id="related-topics" class="tag-cloud"></div>
+            </div>
+          </div>
+
+          <!-- Similar questions -->
+          <div class="card card--questions">
+            <div class="card-header">
+              <span class="card-icon">🤔</span>
+              <h2 class="card-title">Follow-up Questions</h2>
+            </div>
+            <div class="card-body">
+              <ul id="similar-questions" class="questions-list"></ul>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- Ask another -->
+      <div class="ask-another">
+        <button class="ask-another-btn" id="ask-another-btn">Ask another question ↑</button>
+      </div>
+
+    </section>
+
+  </div><!-- /.app -->
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
